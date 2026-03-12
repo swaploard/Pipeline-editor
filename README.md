@@ -1,5 +1,7 @@
 # Pipeline Builder
 
+![My Diagram](./pipelineeditor.jpeg)
+
 A **visual pipeline editor** that allows users to create nodes, connect them, and analyze the pipeline structure.
 
 The application consists of:
@@ -83,7 +85,7 @@ npm run dev
 Application will run at:
 
 ```
-http://localhost:5173
+http://localhost:3000
 ```
 
 ---
