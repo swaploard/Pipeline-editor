@@ -44,5 +44,6 @@ export function usePipeline() {
     onEdgesChange,
     onConnect,
     addNode,
+    setEdges
   };
 }

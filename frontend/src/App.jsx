@@ -7,6 +7,9 @@ import ReactFlow, {
   Controls,
   MiniMap,
   Panel,
+  getIncomers,
+  getOutgoers,
+  getConnectedEdges,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
@@ -38,24 +41,24 @@ const nodeTypes = {
 
 // Toolbar node palette config
 const NODE_PALETTE = [
-  { type: 'InputNode',  label: 'Input',   color: 'oklch(0.55 0.2 150)',  icon: '⤵' },
-  { type: 'OutputNode', label: 'Output',  color: 'oklch(0.55 0.18 200)', icon: '⤴' },
-  { type: 'LLMNode',    label: 'LLM',     color: 'oklch(0.6 0.2 270)',   icon: '◈' },
-  { type: 'TextNode',   label: 'Text',    color: 'oklch(0.6 0.18 50)',   icon: 'T' },
-  { type: 'MathNode',   label: 'Math',    color: 'oklch(0.6 0.2 340)',   icon: '∑' },
-  { type: 'FilterNode', label: 'Filter',  color: 'oklch(0.6 0.2 70)',    icon: '⊟' },
-  { type: 'ApiNode',    label: 'API',     color: 'oklch(0.6 0.18 200)',  icon: '⇅' },
-  { type: 'LoggerNode', label: 'Logger',  color: 'oklch(0.6 0.15 130)',  icon: '≡' },
-  { type: 'DelayNode',  label: 'Delay',   color: 'oklch(0.6 0.18 300)',  icon: '⏱' },
+  { type: 'InputNode', label: 'Input', color: 'oklch(0.55 0.2 150)', icon: '⤵' },
+  { type: 'OutputNode', label: 'Output', color: 'oklch(0.55 0.18 200)', icon: '⤴' },
+  { type: 'LLMNode', label: 'LLM', color: 'oklch(0.6 0.2 270)', icon: '◈' },
+  { type: 'TextNode', label: 'Text', color: 'oklch(0.6 0.18 50)', icon: 'T' },
+  { type: 'MathNode', label: 'Math', color: 'oklch(0.6 0.2 340)', icon: '∑' },
+  { type: 'FilterNode', label: 'Filter', color: 'oklch(0.6 0.2 70)', icon: '⊟' },
+  { type: 'ApiNode', label: 'API', color: 'oklch(0.6 0.18 200)', icon: '⇅' },
+  { type: 'LoggerNode', label: 'Logger', color: 'oklch(0.6 0.15 130)', icon: '≡' },
+  { type: 'DelayNode', label: 'Delay', color: 'oklch(0.6 0.18 300)', icon: '⏱' },
 ];
 
 export default function App() {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode } =
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, addNode, setEdges } =
     usePipeline();
 
-  const [result, setResult]     = useState(null);
-  const [error, setError]       = useState(null);
-  const [loading, setLoading]   = useState(false);
+  const [result, setResult] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
   const [showResult, setShowResult] = useState(false);
 
   // Drop a node at a sensible staggered position
@@ -83,6 +86,35 @@ export default function App() {
       setLoading(false);
     }
   };
+
+  const onNodesDelete = useCallback(
+    (deleted) => {
+      let remainingNodes = [...nodes];
+      setEdges(
+        deleted.reduce((acc, node) => {
+          const incomers = getIncomers(node, remainingNodes, acc);
+          const outgoers = getOutgoers(node, remainingNodes, acc);
+          const connectedEdges = getConnectedEdges([node], acc);
+
+          const remainingEdges = acc.filter((edge) => !connectedEdges.includes(edge));
+
+          const createdEdges = incomers.flatMap(({ id: source }) =>
+            outgoers.map(({ id: target }) => ({
+              id: `${source}->${target}`,
+              source,
+              target,
+            })),
+          );
+
+          remainingNodes = remainingNodes.filter((rn) => rn.id !== node.id);
+
+          return [...remainingEdges, ...createdEdges];
+        }, edges),
+      );
+    },
+    [nodes, edges],
+  );
+
 
   return (
     <div className="flex h-screen w-screen overflow-hidden font-sans" style={{ background: 'oklch(0.11 0.01 264)' }}>
@@ -183,6 +215,7 @@ export default function App() {
           nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
+          onNodesDelete={onNodesDelete}
           onConnect={onConnect}
           fitView
           proOptions={{ hideAttribution: true }}
@@ -290,10 +323,12 @@ export default function App() {
                 </h2>
                 <div className="flex flex-col gap-3">
                   {[
-                    { label: 'Nodes',  value: result?.num_nodes, color: 'oklch(0.6 0.2 250)' },
-                    { label: 'Edges',  value: result?.num_edges, color: 'oklch(0.55 0.18 200)' },
-                    { label: 'Is DAG', value: result?.is_dag ? 'true' : 'false',
-                      color: result?.is_dag ? 'oklch(0.6 0.2 150)' : 'oklch(0.6 0.22 27)' },
+                    { label: 'Nodes', value: result?.num_nodes, color: 'oklch(0.6 0.2 250)' },
+                    { label: 'Edges', value: result?.num_edges, color: 'oklch(0.55 0.18 200)' },
+                    {
+                      label: 'Is DAG', value: result?.is_dag ? 'true' : 'false',
+                      color: result?.is_dag ? 'oklch(0.6 0.2 150)' : 'oklch(0.6 0.22 27)'
+                    },
                   ].map(({ label, value, color }) => (
                     <div
                       key={label}
